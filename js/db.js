@@ -1,15 +1,14 @@
 /**
- * db.js - IndexedDB para almacenamiento offline de remesas
- * PASO 3: Base de datos local
+ * db.js - IndexedDB para Remesas Pro
+ * Stores: compras, envios, config, tasas, syncQueue
  */
 
-const DB_NAME = 'RemesasDB';
-const DB_VERSION = 1;
+const DB_NAME = 'RemesasProDB';
+const DB_VERSION = 2;
 
 const db = {
   instance: null,
 
-  // Inicializar la base de datos
   async init() {
     return new Promise((resolve, reject) => {
       const request = indexedDB.open(DB_NAME, DB_VERSION);
@@ -23,43 +22,29 @@ const db = {
       request.onupgradeneeded = (event) => {
         const database = event.target.result;
 
-        // Store: Remesas/Transacciones principales
-        if (!database.objectStoreNames.contains('remesas')) {
-          const remesasStore = database.createObjectStore('remesas', { keyPath: 'id', autoIncrement: true });
-          remesasStore.createIndex('fecha', 'fecha', { unique: false });
-          remesasStore.createIndex('estado', 'estado', { unique: false });
-          remesasStore.createIndex('tipo', 'tipo', { unique: false });
-          remesasStore.createIndex('synced', 'synced', { unique: false });
-        }
-
-        // Store: Compras
         if (!database.objectStoreNames.contains('compras')) {
-          const comprasStore = database.createObjectStore('compras', { keyPath: 'id', autoIncrement: true });
-          comprasStore.createIndex('fecha', 'fecha', { unique: false });
-          comprasStore.createIndex('synced', 'synced', { unique: false });
+          const store = database.createObjectStore('compras', { keyPath: 'id', autoIncrement: true });
+          store.createIndex('fecha', 'fecha', { unique: false });
+          store.createIndex('synced', 'synced', { unique: false });
+          store.createIndex('proveedor', 'proveedor', { unique: false });
         }
 
-        // Store: Envíos
         if (!database.objectStoreNames.contains('envios')) {
-          const enviosStore = database.createObjectStore('envios', { keyPath: 'id', autoIncrement: true });
-          enviosStore.createIndex('fecha', 'fecha', { unique: false });
-          enviosStore.createIndex('estado', 'estado', { unique: false });
-          enviosStore.createIndex('synced', 'synced', { unique: false });
+          const store = database.createObjectStore('envios', { keyPath: 'id', autoIncrement: true });
+          store.createIndex('fecha', 'fecha', { unique: false });
+          store.createIndex('synced', 'synced', { unique: false });
+          store.createIndex('cliente', 'cliente', { unique: false });
         }
 
-        // Store: Bancos/Cuentas
-        if (!database.objectStoreNames.contains('bancos')) {
-          const bancosStore = database.createObjectStore('bancos', { keyPath: 'id', autoIncrement: true });
-          bancosStore.createIndex('nombre', 'nombre', { unique: false });
-          bancosStore.createIndex('synced', 'synced', { unique: false });
-        }
-
-        // Store: Configuración y Auth
         if (!database.objectStoreNames.contains('config')) {
           database.createObjectStore('config', { keyPath: 'key' });
         }
 
-        // Store: Cola de sincronización pendiente
+        if (!database.objectStoreNames.contains('tasas')) {
+          const store = database.createObjectStore('tasas', { keyPath: 'fecha' });
+          store.createIndex('tipo', 'tipo', { unique: false });
+        }
+
         if (!database.objectStoreNames.contains('syncQueue')) {
           database.createObjectStore('syncQueue', { keyPath: 'id', autoIncrement: true });
         }
@@ -67,12 +52,13 @@ const db = {
     });
   },
 
-  // Operaciones CRUD genéricas
+  // CRUD genérico
   async add(storeName, data) {
     return new Promise((resolve, reject) => {
       const tx = this.instance.transaction([storeName], 'readwrite');
       const store = tx.objectStore(storeName);
-      const request = store.add({ ...data, synced: false, fechaCreado: new Date().toISOString() });
+      const item = { ...data, synced: false, fechaLocal: new Date().toISOString() };
+      const request = store.add(item);
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
@@ -118,7 +104,6 @@ const db = {
     });
   },
 
-  // Obtener items no sincronizados
   async getUnsynced(storeName) {
     return new Promise((resolve, reject) => {
       const tx = this.instance.transaction([storeName], 'readonly');
@@ -130,7 +115,6 @@ const db = {
     });
   },
 
-  // Marcar como sincronizado
   async markAsSynced(storeName, id) {
     const item = await this.getById(storeName, id);
     if (item) {
@@ -140,7 +124,7 @@ const db = {
     }
   },
 
-  // Configuración
+  // Config
   async setConfig(key, value) {
     return new Promise((resolve, reject) => {
       const tx = this.instance.transaction(['config'], 'readwrite');
@@ -161,7 +145,7 @@ const db = {
     });
   },
 
-  // Cola de sincronización
+  // Sync Queue
   async addToSyncQueue(action, storeName, data) {
     return this.add('syncQueue', { action, storeName, data, timestamp: Date.now() });
   },
@@ -180,31 +164,23 @@ const db = {
     });
   },
 
-  // Estadísticas rápidas
+  // Stats
   async getStats() {
-    const [remesas, compras, envios, bancos] = await Promise.all([
-      this.getAll('remesas'),
+    const [compras, envios] = await Promise.all([
       this.getAll('compras'),
-      this.getAll('envios'),
-      this.getAll('bancos')
+      this.getAll('envios')
     ]);
 
-    const totalRemesas = remesas.reduce((sum, r) => sum + (parseFloat(r.monto) || 0), 0);
     const totalCompras = compras.reduce((sum, c) => sum + (parseFloat(c.monto) || 0), 0);
-    const totalEnvios = envios.reduce((sum, e) => sum + (parseFloat(e.monto) || 0), 0);
+    const totalEnvios = compras.reduce((sum, e) => sum + (parseFloat(e.montoUsd) || 0), 0);
+    const hoy = new Date().toDateString();
+    const comprasHoy = compras.filter(c => new Date(c.fecha).toDateString() === hoy).length;
+    const enviosHoy = envios.filter(e => new Date(e.fecha).toDateString() === hoy).length;
 
-    return {
-      totalRemesas,
-      totalCompras,
-      totalEnvios,
-      countBancos: bancos.length,
-      countPendientes: remesas.filter(r => r.estado === 'pendiente').length,
-      countCompletadas: remesas.filter(r => r.estado === 'completada').length
-    };
+    return { totalCompras, totalEnvios, comprasHoy, enviosHoy, countPendientes: compras.filter(c => !c.synced).length + envios.filter(e => !e.synced).length };
   }
 };
 
-// Exportar para módulos o uso global
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = db;
 }
