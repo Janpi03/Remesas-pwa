@@ -5,8 +5,8 @@
 
 const app = {
   // Configuración API (cámbiala por la tuya real)
-  API_URL: 'https://script.google.com/macros/s/TU_ID_DE_DEPLOY/exec',
-  API_KEY: 'tu-clave-secreta-aqui',
+  API_URL: 'https://script.google.com/macros/s/AKfycbxusT5lozIXYdPs-qC6JlC7r4taWjw8bw0RgkSFV7i4EzuV0OFcHlcXukDbj6VfHvgg/exec',
+  API_KEY: '1725644079',
 
   async init() {
     await db.init();
