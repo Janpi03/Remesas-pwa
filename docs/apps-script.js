@@ -8,8 +8,8 @@
 // ============================================
 // CONFIGURACIÓN - REEMPLAZAR ESTOS VALORES
 // ============================================
-const SPREADSHEET_ID = 'TU_ID_DE_SPREADSHEET'; // Ej: 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms
-const API_KEY_SECRET = 'tu-clave-secreta-aqui'; // Mínimo 10 caracteres
+const SPREADSHEET_ID = 1CTkohvxExIHOTb_cyst68IiGisMxudpK; // Ej: 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms
+const API_KEY_SECRET = '1725644079; // Mínimo 10 caracteres
 
 // Nombres de las hojas dentro del Spreadsheet
 const SHEETS = {
