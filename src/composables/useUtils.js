@@ -43,6 +43,15 @@ export function showToast(message, type = 'info', duration = 3000) {
     _toastHandler(message, type, duration)
     return
   }
-  // Fallback si el componente toast no está montado
-  console.info(`[Toast ${type}] ${message}`)
+  // Fallback DOM — funciona sin registro de componente
+  const prev = document.querySelector('.toast')
+  if (prev) prev.remove()
+  const el = document.createElement('div')
+  el.className = `toast toast-${type}`
+  el.textContent = message
+  document.body.appendChild(el)
+  setTimeout(() => {
+    el.style.animation = 'toastSlide 0.3s ease reverse'
+    setTimeout(() => el.remove(), 300)
+  }, duration)
 }
